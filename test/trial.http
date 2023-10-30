@@ -1,0 +1,27 @@
+### Get Access Token
+# @name requestAccessToken
+POST {{$dotenv access_token_url}}/oauth/token
+Accept: application/json
+Authorization: Basic {{$dotenv clientid}}:{{$dotenv clientsecret}}
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=password
+&username={{$dotenv username}}
+&password={{$dotenv password}}
+&client_id={{$dotenv clientid}}
+&response_type=token
+
+### Fill Variables from Response
+@access_token = {{requestAccessToken.response.body.$.access_token}}
+
+
+### On Prem
+
+GET https://14bdcb4atrial-dev-neptune-proxy-srv.cfapps.us10-001.hana.ondemand.com/callonprem
+Authorization: Bearer {{access_token}}
+
+
+### On Prem
+
+GET https://14bdcb4atrial-dev-neptune-proxy-srv.cfapps.us10-001.hana.ondemand.com/sap/opu/odata/SAP/SEPMRA_PO_APV/PurchaseOrders
+Authorization: Bearer {{access_token}}

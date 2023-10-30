@@ -1,0 +1,8 @@
+{
+  "name": "neptune-proxy",
+  "scripts": {
+    "build:cf": "mbt build",
+    "deploy:cf": "cf deploy mta_archives/neptune-proxy-pkce_1.0.0.mtar --retries 0",
+    "undeploy:cf": "cf undeploy neptune-proxy-pkce --delete-service-keys --delete-services --delete-service-brokers"
+  }
+}

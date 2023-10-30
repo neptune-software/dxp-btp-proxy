@@ -1,0 +1,25 @@
+### Get Access Token
+# @name requestAccessToken
+POST {{$dotenv access_token_url_freetier}}/oauth/token
+Accept: application/json
+Authorization: Basic {{$dotenv clientid_freetier}}:{{$dotenv clientsecret_freetier}}
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=password
+&username={{$dotenv username}}
+&password={{$dotenv password}}
+&client_id={{$dotenv clientid_freetier}}
+&response_type=token
+
+### Fill Variables from Response
+@access_token = {{requestAccessToken.response.body.$.access_token}}
+
+### On Prem
+
+GET https://neptune-software-as-free-tier---aws-us-dev-neptune-proxy-srv.cfapps.us10-001.hana.ondemand.com/neptune/NEPTUNE_FLIGHT
+Authorization: Bearer {{access_token}}
+
+### Flight OData service
+
+GET https://neptune-software-as-free-tier---aws-us-dev-neptune-proxy-srv.cfapps.us10-001.hana.ondemand.com/sap/opu/odata/sap/ZFLIGHT_R/Airport
+Authorization: Bearer {{access_token}}

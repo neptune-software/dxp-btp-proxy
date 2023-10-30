@@ -1,0 +1,86 @@
+_schema-version: "3.2"
+ID: neptune-proxy-pkce
+description: Neptune Proxy
+version: 1.0.0
+
+modules:
+  - name: neptune-proxy-pkce-srv
+    type: nodejs
+    path: srv
+    parameters:
+      buildpack: nodejs_buildpack
+      memory: 256M
+      disk-quota: 1024M
+      stack: cflinuxfs4
+    properties:
+      IAS_PKCE_XCHANGE_ENABLED: true
+    provides:
+      - name: srv-api
+        properties:
+          srv-url: ${default-url}
+    requires:
+      - name: neptune-proxy-destination
+      - name: neptune-proxy-uaa
+      - name: neptune-proxy-connectivity
+      - name: neptune-proxy-ias
+resources:
+  - name: neptune-proxy-destination
+    type: org.cloudfoundry.managed-service
+    parameters:
+      config:
+        init_data:
+          subaccount:
+            destinations:
+              - Name: ui5
+                Authentication: NoAuthentication
+                ProxyType: Internet
+                Type: HTTP
+                URL: https://ui5.sap.com
+              - Name: northwind
+                Authentication: NoAuthentication
+                ProxyType: Internet
+                Type: HTTP
+                URL: https://services.odata.org
+            existing_destinations_policy: ignore
+      service-plan: lite
+      service: destination
+  - name: neptune-proxy-uaa
+    type: org.cloudfoundry.managed-service
+    parameters:
+      path: ./xs-security.json
+      service: xsuaa
+      service-plan: application
+  - name: neptune-proxy-connectivity
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: connectivity
+      service-name: neptune-proxy-connectivity
+      service-plan: lite
+  - name: neptune-proxy-ias
+    type: org.cloudfoundry.managed-service
+    requires:
+      - name: srv-api
+    parameters:
+      service: identity
+      service-name: neptune-proxy-ias
+      service-plan: application
+      config:
+        oauth2-configuration:
+          public-client: true
+          redirect-uris: ["http://localhost/", "https://localhost/"]
+          grant-types:
+            [
+              "authorization_code_pkce_s256",
+              "urn:ietf:params:oauth:grant-type:jwt-bearer",
+            ]
+          credential-types: ["x509", "client_credentials"]
+          token-policy:
+            refresh-parallel: 1
+            refresh-validity: 7776000
+            token-validity: 1800
+        xsuaa-cross-consumption: true
+        multi-tenant: false
+      service-keys:
+        - name: default
+          config:
+            credential-type: SECRET
