@@ -1,0 +1,175 @@
+{
+	"info": {
+		"_postman_id": "c79a7bf5-257f-4092-9cce-0dc3ad58a577",
+		"name": "DXP-BTP-Proxy",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "19921827"
+	},
+	"item": [
+		{
+			"name": "ODATA Get User Details",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{BTP_CF_SERVICE_URL}}/sap/opu/odata/sap/ZUSERDETAILS_SRV/WhoAmI",
+					"host": [
+						"{{BTP_CF_SERVICE_URL}}"
+					],
+					"path": [
+						"sap",
+						"opu",
+						"odata",
+						"sap",
+						"ZUSERDETAILS_SRV",
+						"WhoAmI"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "get neptune flight app html",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{BTP_CF_SERVICE_URL}}/neptune/NEPTUNE_FLIGHT",
+					"host": [
+						"{{BTP_CF_SERVICE_URL}}"
+					],
+					"path": [
+						"neptune",
+						"NEPTUNE_FLIGHT"
+					]
+				}
+			},
+			"response": []
+		}
+	],
+	"auth": {
+		"type": "oauth2",
+		"oauth2": [
+			{
+				"key": "redirect_uri",
+				"value": "{{OAUTH_CALLBACK_URI}}",
+				"type": "string"
+			},
+			{
+				"key": "authRequestParams",
+				"value": [
+					{
+						"key": "login_hint",
+						"value": "{\"origin\":\"sap.default\"}",
+						"enabled": false,
+						"send_as": "request_url"
+					},
+					{
+						"key": "client_id",
+						"value": "{{BTP_IAS_CLIENT_ID}}",
+						"enabled": true,
+						"send_as": "request_url"
+					}
+				],
+				"type": "any"
+			},
+			{
+				"key": "clientId",
+				"value": "{{BTP_IAS_CLIENT_ID}}",
+				"type": "string"
+			},
+			{
+				"key": "accessTokenUrl",
+				"value": "{{BTP_IAS_URL}}/oauth2/token",
+				"type": "string"
+			},
+			{
+				"key": "authUrl",
+				"value": "{{BTP_IAS_URL}}/oauth2/authorize",
+				"type": "string"
+			},
+			{
+				"key": "refreshRequestParams",
+				"value": [],
+				"type": "any"
+			},
+			{
+				"key": "tokenRequestParams",
+				"value": [],
+				"type": "any"
+			},
+			{
+				"key": "tokenName",
+				"value": "BTP",
+				"type": "string"
+			},
+			{
+				"key": "challengeAlgorithm",
+				"value": "S256",
+				"type": "string"
+			},
+			{
+				"key": "scope",
+				"value": "openid",
+				"type": "string"
+			},
+			{
+				"key": "grant_type",
+				"value": "authorization_code_with_pkce",
+				"type": "string"
+			},
+			{
+				"key": "addTokenTo",
+				"value": "header",
+				"type": "string"
+			},
+			{
+				"key": "client_authentication",
+				"value": "body",
+				"type": "string"
+			}
+		]
+	},
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "BTP_IAS_URL",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "BTP_IAS_CLIENT_ID",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "OAUTH_CALLBACK_URI",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "BTP_CF_SERVICE_URL",
+			"value": "",
+			"type": "string"
+		}
+	]
+}

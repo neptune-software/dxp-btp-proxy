@@ -67,7 +67,7 @@ resources:
       config:
         oauth2-configuration:
           public-client: true
-          redirect-uris: ["http://localhost/", "https://localhost/"]
+          redirect-uris: ["http://localhost/", "https://localhost/", "https://oauth.pstmn.io/v1/callback" ]
           grant-types:
             [
               "authorization_code_pkce_s256",
