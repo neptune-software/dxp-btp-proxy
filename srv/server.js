@@ -3,26 +3,21 @@ const express = require("express");
 const passport = require("passport");
 const xsenv = require("@sap/xsenv");
 const { JWTStrategy, TokenInfo } = require("@sap/xssec");
+const tokenCache = require("./tokenCache");
+
 const PORT = process.env.PORT || 4000;
-const DESTINATION = "n4drtpp";
-const jwtDecode = require("jwt-decode");
-const NodeCache = require("node-cache");
+const DESTINATION = process.env.DESTINATION;
+const VCAP_SERVICES = JSON.parse(process.env.VCAP_SERVICES);
 
 const app = express();
 
-//xsenv.loadEnv();
-
-// Initialize a cache for tokens
-// Consider using a Redis Cache for productive scenarios
-const tokenCache = new NodeCache();
-
-//const services = xsenv.getServices({ uaa: "neptune-proxy-uaa" });
+if (!DESTINATION) {
+  console.error("No Destination configured");
+}
 const iasConfig = xsenv.getServices({ ias: { label: "identity" } }).ias;
 
-//passport.use(new JWTStrategy(services.uaa));
 passport.use("IAS", new JWTStrategy(iasConfig, "IAS"));
 
-const VCAP_SERVICES = JSON.parse(process.env.VCAP_SERVICES);
 const destSrvCred = VCAP_SERVICES.destination[0].credentials;
 const conSrvCred = VCAP_SERVICES.connectivity[0].credentials;
 
@@ -43,19 +38,20 @@ app.use("/", async function (req, res, next) {
       return next();
     }
 
-    console.log("valid");
-
     // Store encoded token value
     const token = tokenInfo.getTokenValue();
 
-    // Check if token is cached
-    const cachedToken = null; //tokenCache.get(token);
+    console.log("tokenCache Stats:", tokenCache.getStats());
 
-    console.log("cachedToken:", cachedToken);
+    // Check if token is cached
+    const cachedToken = tokenCache.getToken(token);
 
     if (cachedToken) {
       // If token is cached, use the cached token and proceed to next middleware
       req.headers["authorization"] = `Bearer ${cachedToken}`;
+
+      console.log("cachedToken is used!");
+
       return next();
     } else {
       // If token is not cached, authenticate using passport
@@ -71,25 +67,21 @@ app.use("/", async function (req, res, next) {
                 .status(err.response?.status || 401)
                 .send(`Error: ${err.message}`);
 
-            console.log("token:" + token);
+            //console.log("token:" + token);
             // Exchange token
             const exchangedToken = await exchangeToken(token);
 
-            console.log("exchangedToken:" + exchangedToken);
+            //console.log("exchangedToken:" + exchangedToken);
 
             // Set the exchanged token in the cache
-            tokenCache.set(
-              token,
-              exchangedToken,
-              jwtDecode(exchangedToken).exp || 3600
-            );
+            tokenCache.setToken(token, exchangedToken);
 
             // Set the authorization header with the new token
             req.headers["authorization"] = `Bearer ${exchangedToken}`;
 
             // Proceed to next middleware
 
-            console.log(">>>>> PKCE end <<<<<");
+            //console.log(">>>>> PKCE end <<<<<");
 
             return next();
           } catch (err) {
@@ -115,65 +107,88 @@ app.use("/", async function (req, res, next) {
 app.use("/", async function (req, res) {
   console.log(">>>>> Request begin <<<<<");
 
-  //app.use(passport.authenticate("JWT", { session: false }));
+  try {
+    //app.use(passport.authenticate("JWT", { session: false }));
 
-  const authorization = req.headers.authorization;
-  console.log("authorization=", authorization);
+    const authorization = req.headers.authorization;
+    //console.log("authorization=", authorization);
 
-  // call destination service
-  const destJwtToken = await _fetchJwtToken(
-    destSrvCred.url,
-    destSrvCred.clientid,
-    destSrvCred.clientsecret
-  );
+    // call destination service
+    const destJwtToken = await _fetchJwtToken(
+      destSrvCred.url,
+      destSrvCred.clientid,
+      destSrvCred.clientsecret
+    );
 
-  console.log("destJwtToken=", destJwtToken);
+    //console.log("destJwtToken=", destJwtToken);
 
-  const url = req.originalUrl;
-  const method = req.method.toLocaleLowerCase();
+    const url = req.originalUrl;
+    const method = req.method.toLocaleLowerCase();
+    const headers = req.headers;
 
-  const destiConfi = await _readDestinationConfig(
-    DESTINATION,
-    destSrvCred.uri,
-    destJwtToken
-  );
+    const destiConfi = await _readDestinationConfig(
+      DESTINATION,
+      destSrvCred.uri,
+      destJwtToken
+    );
 
-  console.log("destiConfi", destiConfi);
+    //console.log("destiConfi", destiConfi);
 
-  //call onPrem system via connectivity service and Cloud Connector
-  const connJwtToken = await _fetchJwtToken(
-    conSrvCred.token_service_url,
-    conSrvCred.clientid,
-    conSrvCred.clientsecret
-  );
+    //call onPrem system via connectivity service and Cloud Connector
+    const connJwtToken = await _fetchJwtToken(
+      conSrvCred.token_service_url,
+      conSrvCred.clientid,
+      conSrvCred.clientsecret
+    );
 
-  const userExchangeToken = await _fetchUserExchangeToken(
-    conSrvCred.url,
-    conSrvCred.clientid,
-    conSrvCred.clientsecret,
-    authorization
-  );
+    const userExchangeToken = await _fetchUserExchangeToken(
+      conSrvCred.url,
+      conSrvCred.clientid,
+      conSrvCred.clientsecret,
+      authorization
+    );
 
-  console.log("userExchangeToken=", userExchangeToken);
+    const result = await _callOnPrem(
+      conSrvCred.onpremise_proxy_host,
+      conSrvCred.onpremise_proxy_http_port,
+      connJwtToken,
+      destiConfi,
+      url,
+      method,
+      headers,
+      userExchangeToken
+    )
+      .then((result) => {
+        res.send(result);
+      })
+      .catch((error) => {
+        console.log("error >>>>>>>>>>>>");
+        console.log(error);
+        console.log("error <<<<<<<<<<<<");
+        res
+          .status(500)
+          .send({ error: "Error occured. Please check log files" });
+      });
 
-  const result = await _callOnPrem(
-    conSrvCred.onpremise_proxy_host,
-    conSrvCred.onpremise_proxy_http_port,
-    connJwtToken,
-    destiConfi,
-    url,
-    method,
-    userExchangeToken
-  )
-    .then((result) => {
-      res.send(result);
-    })
-    .catch((error) => {
-      console.log("error >>>>>>>>>>>>");
-      console.log(error);
-      console.log("error <<<<<<<<<<<<");
-      res.status(500).send({ error: "Error occured. Please check log files" });
-    });
+    //console.log("userExchangeToken=", userExchangeToken);
+  } catch (error) {
+    if (error.response) {
+      // The request was made and the server responded with a status code
+      // that falls out of the range of 2xx
+      console.log(error.response.data);
+      console.log(error.response.status);
+      console.log(error.response.headers);
+    } else if (error.request) {
+      // The request was made but no response was received
+      // `error.request` is an instance of XMLHttpRequest in the browser
+      // and an instance of http.ClientRequest in node.js
+      console.log(error.request);
+    } else {
+      // Something happened in setting up the request that triggered an Error
+      console.log("Error", error.message);
+    }
+    res.status(400).send(error.message);
+  }
 });
 
 app.listen(PORT, function () {
@@ -229,11 +244,11 @@ const _fetchUserExchangeToken = async function (
         },
       })
       .then((response) => {
-        console.log("Response:", response.data);
+        //console.log("Response:", response.data);
         resolve(response.data.access_token);
       })
       .catch((error) => {
-        console.error("Error:", error);
+        //console.error("Error:", error);
         reject(error);
       });
   });
@@ -271,6 +286,7 @@ const _callOnPrem = async function (
   destiConfi,
   url,
   method,
+  headers,
   userExchangeToken
 ) {
   return new Promise((resolve, reject) => {
@@ -287,9 +303,15 @@ const _callOnPrem = async function (
     //if (process.env.NODE_ENV === "production") {
     config.headers = {
       //Authorization: "Basic " + encodedUser,
+      "x-requested-with": headers["x-requested-with"],
+      NeptuneLaunchpad: headers.neptunelaunchpad,
+      NeptuneServer: headers.neptuneserver,
       "Proxy-Authorization": "Bearer " + userExchangeToken,
       "SAP-Connectivity-SCC-Location_ID": destiConfi.CloudConnectorLocationId,
     };
+    if (headers["sap-client"]) {
+      config.headers["sap-client"] = headers["sap-client"];
+    }
     config.proxy = {
       host: connProxyHost,
       port: connProxyPort,
@@ -303,7 +325,7 @@ const _callOnPrem = async function (
     //   });
     // }
 
-    console.log("config", config);
+    //console.log("config", config);
 
     axios(config)
       .then((response) => {
@@ -348,7 +370,7 @@ async function exchangeToken(token) {
       // }),
     };
 
-    console.log(options);
+    //console.log(options);
 
     // Make the POST request and wait for the response
     const response = await axios(options);
